@@ -1,5 +1,30 @@
 #!/bin/bash
 
+# 크기를 바이트로 변환하는 함수
+function convert_to_bytes {
+  local size=$1
+  local number=$(echo $size | sed 's/[^0-9.]//g')
+  local unit=$(echo $size | sed 's/[0-9.]//g')
+  
+  case "$unit" in
+    K|k)
+      echo $(awk "BEGIN {print $number * 1024}")
+      ;;
+    M|m)
+      echo $(awk "BEGIN {print $number * 1024 * 1024}")
+      ;;
+    G|g)
+      echo $(awk "BEGIN {print $number * 1024 * 1024 * 1024}")
+      ;;
+    T|t)
+      echo $(awk "BEGIN {print $number * 1024 * 1024 * 1024 * 1024}")
+      ;;
+    *)
+      echo $number
+      ;;
+  esac
+}
+
 # 스크립트 이름과 사용법을 표시하는 함수
 function show_usage {
   echo "사용법: $0 [옵션]"
@@ -71,10 +96,14 @@ for TMP_DIR in $DOCKER_TMP_PATH; do
     LARGE_DIRS=$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d -exec du -sh {} \; 2>/dev/null | sort -rh | head -n "$MAX_DIRS")
     echo "$LARGE_DIRS"
     
-    # 각 큰 디렉토리 처리
+    # 큰 디렉토리 처리
     echo "$LARGE_DIRS" | while read SIZE DIR; do
-      # 크기가 MIN_SIZE보다 큰지 확인 (간단한 비교를 위해 du의 출력 형식 활용)
-      if [[ "$SIZE" == 0 || "$SIZE" == "0" || "$SIZE" == "0K" || "$SIZE" == "0M" ]]; then
+      # 크기가 MIN_SIZE보다 큰지 확인 (사람이 읽기 쉬운 형식을 숫자로 변환)
+      DIR_SIZE_BYTES=$(convert_to_bytes "$SIZE")
+      MIN_SIZE_BYTES=$(convert_to_bytes "$MIN_SIZE")
+      
+      if (( DIR_SIZE_BYTES < MIN_SIZE_BYTES )); then
+        echo "스킵: $DIR ($SIZE) - 최소 크기 $MIN_SIZE 보다 작음"
         continue
       fi
       
